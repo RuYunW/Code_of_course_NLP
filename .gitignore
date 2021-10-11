@@ -4,6 +4,8 @@ __pycache__/
 *$py.class
 
 1-cat-dog_classifier/data/
+1-cat-dog_classifier/.idea/
+1-cat-dog_classifier/__pycache__/
 *.jpg
 *.jpeg
 # C extensions
