@@ -3,6 +3,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+1-cat-dog_classifier/data/
+*.jpg
+*.jpeg
 # C extensions
 *.so
 
