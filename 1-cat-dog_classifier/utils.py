@@ -2,9 +2,9 @@ import os
 import torch
 
 
-def img_reader(path, num_samples=2000):
+def img_reader(path):
     data_list = []
-    img_dir_list = os.listdir(path)[: num_samples]
+    img_dir_list = os.listdir(path)
     for img_name in img_dir_list:
         img_path = path + img_name
         label = img_name.split('.')[0]
