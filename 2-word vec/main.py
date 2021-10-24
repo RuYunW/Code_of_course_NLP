@@ -2,8 +2,6 @@ import argparse
 from utils import train
 import time
 
-
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-file_path', help='txt file path', dest='fpath', default='./data/zh.txt', required=True)
@@ -21,8 +19,3 @@ if __name__ == '__main__':
     stop_time = time.clock()
     cost = stop_time - start_time
     print("totally cost %s second" % (cost))
-
-
-
-    # train(args.fi, args.fo, bool(args.cbow), args.neg, args.dim, args.alpha, args.win,
-    #       args.min_count, args.num_processes, bool(args.binary))
