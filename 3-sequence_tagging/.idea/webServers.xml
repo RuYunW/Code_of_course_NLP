@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="WebServers">
+    <option name="servers">
+      <webServer id="0b04caf5-742c-46cb-89a4-6793b8b0d303" name="lgh" url="http://10.10.110.90">
+        <fileTransfer host="10.10.110.90" port="30053" accessType="SFTP">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
+          <option name="port" value="30053" />
+        </fileTransfer>
+      </webServer>
+      <webServer id="5e31c44e-a0e1-4b0c-8caa-562f00d75813" name="10.10.110.117" url="http://10.10.110.117">
+        <fileTransfer host="10.10.110.117" port="22" accessType="SFTP">
+          <advancedOptions>
+            <advancedOptions controlEncoding="UTF-8" dataProtectionLevel="Private" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
+          <option name="port" value="22" />
+        </fileTransfer>
+      </webServer>
+    </option>
+  </component>
+</project>
