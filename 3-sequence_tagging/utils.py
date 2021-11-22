@@ -41,22 +41,18 @@ def dev(model, dev_loader, epoch=0):
     pred = []
     sentence_len = []
     length = 0
-    # acc, recall, F1, acc_wo, recall_wo, F1_wo = 0, 0, 0, 0, 0, 0
+
     for i, batch_data in enumerate(dev_loader):
         feats = model(batch_data)
         masks = batch_data['text_info']['attention_mask']
         tags = batch_data['tags']
-        # sentence_len = batch_data['sentence_len']
         length += tags.size(0)
 
         path_score, best_path = model.crf(feats, masks.bool())
         loss = model.loss(feats, masks, tags)
         eval_loss += loss.item()
-        # print(best_path.cpu().tolist())
-        # exit()
         pred.extend([t for t in best_path.cpu().tolist()])
         true.extend([t for t in tags.cpu().tolist()])
-        # sentence_len.extend([t for t in sentence_len])
 
     acc, recall, F1 = evaluation(pred, true)
     acc_wo, recall_wo, F1_wo = evaluation(pred, true, neglect=True)
@@ -77,11 +73,6 @@ def save_results(eval_info, labels, text_path, save_path):
         ix_to_tag[ix] = str(t)
     pred = labels['pred']
     true = labels['true']
-    # print(pred)
-    # print(len(pred))
-    # print(len(pred[0]))
-    # exit()
-
     all_pred_tag = []
     all_true_tag = []
     all_text_t = []
@@ -96,9 +87,6 @@ def save_results(eval_info, labels, text_path, save_path):
     assert len(text_lines) == len(pred), 'num sample not match'
 
     for i, text in tqdm(enumerate(text_lines)):
-        # print([ix_to_tag[id] for id in pred[i]])
-        # print(' '.join([ix_to_tag[id] for id in pred[i]]))
-        # print(pred[i])
         all_pred_tag.append(' '.join([ix_to_tag[id] for id in pred[i]]))
         all_true_tag.append(' '.join([ix_to_tag[id] for id in true[i]]))
         all_text_t.append(text[:-1])
@@ -106,7 +94,9 @@ def save_results(eval_info, labels, text_path, save_path):
     print('Writing result file...')
     with open(save_path, 'w', encoding='utf-8') as fw:
         fw.write('acc: {}, recall: {}, F1: {}'.format(eval_info['acc'], eval_info['recall'], eval_info['F1']))
+        fw.writ('\n')
         fw.write('acc_wo: {}, recall_wo: {}, F1_wo: {}'.format(eval_info['acc_wo'], eval_info['recall_wo'], eval_info['F1_wo']))
+        fw.writ('\n')
         for i in range(len(text_lines)):
             fw.writelines(all_text_t[i])
             fw.writelines('\n')

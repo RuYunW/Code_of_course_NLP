@@ -10,13 +10,14 @@ from dataset import BatchData
 from utils import pkl_reader, dev
 from model.bert_lm import BertLM
 import logging
-import matplotlib.pyplot as plt
+
 import time
 import json
 
 torch.manual_seed(1)
+time_flag = time.strftime("%Y-%m-%d %H:%M:%S")
 logging.basicConfig(level=logging.DEBUG,  # 控制台打印的日志级别
-                    filename='log/train_' + str(time.strftime("%Y-%m-%d %H:%M:%S")) + '_log.log',
+                    filename='log/train_' + str(time_flag) + '_log.log',
                     filemode='a',  ##模式，有w和a，w就是写模式，每次都会重新写日志，覆盖之前的日志
                     # a是追加模式，默认如果不写的话，就是追加模式
                     format=
@@ -88,9 +89,10 @@ for epoch in tqdm(range(num_epoch)):
         optimizer.step()
         if step % 50 == 0:
             print('step: {} |  epoch: {}|  loss: {}'.format(step, epoch, loss.item()))
+            logging.info('step: {} |  epoch: {}|  loss: {}'.format(step, epoch, loss.item()))
     eval_info, _ = dev(model, val_loader, epoch)
     logging.info('------------------------------------')
-    logging.info('epoch: '+str(epoch)+'_step: '+str(step))
+    logging.info('epoch: '+str(epoch)+', \t_step: '+str(step))
     logging.info(eval_info)
     logging.info('max_F1_wo: ' + str(max_F1_wo))
 
