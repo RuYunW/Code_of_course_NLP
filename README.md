@@ -11,5 +11,5 @@
 #### `2-word2vec`  
 第二次作业，主题：词向量训练
 
-####`3-sequence_tagging`
+#### `3-sequence_tagging`
 第三次作业，主题：序列标注
