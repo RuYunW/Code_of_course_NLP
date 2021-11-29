@@ -18,8 +18,7 @@ python main.py fpath './data/en.txt' save_path './output/cbow_zh_vectors.txt
 |`win`|窗口大小，默认5|int|  
 |`min_count`|最小词频，默认5|int|  
 
-#### 参考文献
-> [1] 
+
 
 
     
