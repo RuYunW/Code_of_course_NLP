@@ -13,7 +13,7 @@ I add the **batch-computable CRF** layer after BERT. The source code is borrowed
 
 2. Also, the CRF layer is removable.
 
-3. Each training will be tagged a *time\_flag* at the beginning of training. Thus, the checkpoints, logs, evaluation results, as well as train data records can be distinguished by the *time\_flag* of their file name or dir name. 
+3. Each model will be tagged a *time\_flag* at the beginning of training. Thus, the checkpoints, logs, evaluation results, as well as train data records can be distinguished by the *time\_flag* of their file name or dir name. 
 
 4. Historically optimal checkpoint will be stored into `./checkpoints/`.  
 
