@@ -4,8 +4,8 @@
 1. Change Config/config.json  
 2. if this is your first time run the project, run `python preprocess.py` before training   
 2. to train your model, run `python train.py`  
-3. to eval test set, run `test.py`  
-4. if figures of records is needed, run `figure_painter.py`
+3. to eval test set, run `python test.py`  
+4. if figures of records is needed, run `python figure_painter.py`
 
 ## Some Instructions
 1. The backbone of the model is BERT-BASE.   
