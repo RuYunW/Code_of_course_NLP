@@ -1,58 +1,50 @@
 import matplotlib.pyplot as plt
-import re
-from tqdm import tqdm
 import json
+import pickle as pkl
 
-log_file_path = 'log/train_2021-11-18 22%3A20%3A06_log.log'
+conf_p = "config/config.json"
+with open(conf_p, "r") as fc:
+    conf = json.load(fc)
 
-with open(log_file_path, 'r') as f:
-    log_lines = f.readlines()
+## Config
+model_path = conf['model_path']
+save_figure_dir = conf['save_figure_dir']
+time_flag = str(model_path.split('/')[-2])
+training_data_path = './training_data/train_data' + time_flag + '.pkl'
+with open(training_data_path, 'rb') as ft:
+    training_data = pkl.load(ft)
 
-eval_list = []
-acc_list = []
-recall_list = []
-F1_list = []
-acc_wo_list = []
-recall_wo_list = []
-F1_wo_list = []
-print('Data extracting...')
-# for i, line in tqdm(enumerate(log_lines)):
-#     if '------------------------------------' in line:
-for i in tqdm(range(len(log_lines))):
-    if '---------------------------' in log_lines[i]:
-        text = log_lines[i+1]
-        # containt = re.findall(r'INFO: {(.*?)}', text)[0]
-        # print(containt)
-        # exit()
-        str_dict = str(text.split('INFO: ')[1])
-        a = eval(str_dict)
-        # print(a)
-        # print(str_dict)
-        # print(type(str_dict))
-        # exit()
-        # print(str_dict)
-        # print(type(str_dict))
-        # eval = eval(str_dict)
-        # print(eval)
+## Data
+acc_list = training_data['acc_list']
+acc_wo_list = training_data['acc_wo_list']
+recall_list = training_data['recall_list']
+recall_wo_list = training_data['recall_wo_list']
+F1_list = training_data['F1_list']
+F1_wo_list = training_data['F1_wo_list']
+loss_list = training_data['loss_list']
+epoch_list = training_data['epoch_list']
+time_flag = training_data['time_flag']
 
-        acc_list.append(a['acc'])
-        recall_list.append(a['recall'])
-        F1_list.append(a['F1'])
-        acc_wo_list.append(a['acc_wo'])
-        recall_wo_list.append(a['recall_wo'])
-        F1_wo_list.append(a['F1_wo'])
-#
+## Painting figures
+# Scores
 plt.plot(acc_list)
 plt.plot(recall_list)
 plt.plot(F1_list)
 plt.plot(acc_wo_list)
 plt.plot(recall_wo_list)
 plt.plot(F1_wo_list)
-plt.legend(['Acc', 'Recall', 'F1', 'Acc_wo', 'Recall_wo', 'F1_wo'])
+plt.title('Scores in training')
+plt.legend(['Acc+O', 'Recall+O', 'F1+O', 'Acc-O', 'Recall-O', 'F1-O'])
 plt.ylabel('Scores')
 plt.xlabel('Epoch')
-plt.show()
+plt.savefig(save_figure_dir+time_flag+'_training_data.png')
+plt.clf()
+# loss
+plt.plot(loss_list)
+plt.legend(['loss'])
+plt.title('Loss value in training')
+plt.ylabel('loss')
+plt.xlabel('Epoch')
+plt.savefig(save_figure_dir+time_flag+'_loss.png')
 
-
-
-
+print('Figures has been successfully saved. ')

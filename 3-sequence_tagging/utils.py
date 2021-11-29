@@ -3,6 +3,7 @@ import torch
 import numpy as np
 from torch.autograd import Variable
 from tqdm import tqdm
+import os
 
 def pkl_reader(pkl_path):
     with open(pkl_path, 'rb') as f:
@@ -34,12 +35,12 @@ def evaluation(pred, true, neglect=False):
     return acc, recall, F1
 
 
-def dev(model, dev_loader, epoch=0):
+def dev(model, dev_loader, epoch=0, is_CRF=True):
     model.eval()
     eval_loss = 0
     true = []
     pred = []
-    sentence_len = []
+    # sentence_len = []
     length = 0
 
     for i, batch_data in enumerate(dev_loader):
@@ -48,7 +49,11 @@ def dev(model, dev_loader, epoch=0):
         tags = batch_data['tags']
         length += tags.size(0)
 
-        path_score, best_path = model.crf(feats, masks.bool())
+        if is_CRF:
+            _, best_path = model.crf(feats, masks.bool())
+        else:
+            best_path = model._get_path(feats)
+
         loss = model.loss(feats, masks, tags)
         eval_loss += loss.item()
         pred.extend([t for t in best_path.cpu().tolist()])
@@ -94,9 +99,9 @@ def save_results(eval_info, labels, text_path, save_path):
     print('Writing result file...')
     with open(save_path, 'w', encoding='utf-8') as fw:
         fw.write('acc: {}, recall: {}, F1: {}'.format(eval_info['acc'], eval_info['recall'], eval_info['F1']))
-        fw.writ('\n')
+        fw.write('\n')
         fw.write('acc_wo: {}, recall_wo: {}, F1_wo: {}'.format(eval_info['acc_wo'], eval_info['recall_wo'], eval_info['F1_wo']))
-        fw.writ('\n')
+        fw.write('\n')
         for i in range(len(text_lines)):
             fw.writelines(all_text_t[i])
             fw.writelines('\n')
@@ -108,5 +113,8 @@ def save_results(eval_info, labels, text_path, save_path):
     print('Result file writing completed.')
     print('File is saved to: ' + save_path)
 
+def create_dir_not_exist(path):
+    if not os.path.exists(path):
+        os.mkdir(path)
 
 

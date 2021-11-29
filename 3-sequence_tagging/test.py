@@ -9,15 +9,7 @@ from tqdm import tqdm
 from model.bert_lm import BertLM
 
 torch.manual_seed(1)
-time_flag = time.strftime("%Y-%m-%d %H:%M:%S")
-# logging.basicConfig(level=logging.DEBUG,  # 控制台打印的日志级别
-#                     filename='log/test_' + str(time_flag) + '_log.log',
-#                     filemode='a',  ##模式，有w和a，w就是写模式，每次都会重新写日志，覆盖之前的日志
-#                     # a是追加模式，默认如果不写的话，就是追加模式
-#                     format=
-#                     '%(asctime)s - %(pathname)s[line:%(lineno)d] - %(levelname)s: %(message)s'
-#                     # 日志格式
-#                     )
+# time_flag = time.strftime("%Y-%m-%d %H:%M:%S")
 
 conf_p = "config/config.json"
 with open(conf_p, "r") as f:
@@ -29,8 +21,10 @@ test_pkl_path = conf['test_pkl_path']
 # save_checkpoint_dir = conf['save_checkpoint_dir']
 model_path = conf['model_path']
 results_dir = conf['results_dir']
-
+time_flag = str(model_path.split('/')[-2])
+print('time flag: ' + time_flag)
 batch_size = conf['batch_size']
+is_CRF = conf['is_CRF']
 # num_epoch = conf['num_epoch']
 lr = conf['lr']
 result_save_path = results_dir + 'results_' + str(time_flag) + '.txt'
@@ -44,9 +38,10 @@ test_dataset = BatchData(test_data)
 test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
 ## Load Model
-model = BertLM()
+model = BertLM(is_CRF=is_CRF)
 model_param = torch.load(model_path)
 model.load_state_dict(model_param['model'])
+
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 model.to(device)
 model.eval()
@@ -54,7 +49,7 @@ print('device: ' + str(device))
 
 
 
-eval_info, labels = dev(model, test_loader)
+eval_info, labels = dev(model=model, dev_loader=test_loader, is_CRF=is_CRF)
 
 acc, recall, F1 = eval_info['acc'], eval_info['recall'], eval_info['F1']
 acc_wo, recall_wo, F1_wo = eval_info['acc_wo'], eval_info['recall_wo'], eval_info['F1_wo']
