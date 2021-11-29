@@ -1,10 +1,10 @@
 ### Word2ec Python实现
-
+----
 #### Quick Start
 ```python
 python main.py fpath './data/en.txt' save_path './output/cbow_zh_vectors.txt
 ```
-
+---
 #### 参数说明
 
 |**字段**|**说明**|**数据类型**|
