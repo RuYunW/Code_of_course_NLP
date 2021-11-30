@@ -3,7 +3,7 @@
   "test_pkl_path": "feature/test.pkl",
   "save_checkpoint_dir": "./checkpoints/",
   "save_figure_dir": "./figure/",
-  "model_path": "/home/wry/NLP_code/3-sequence_tagging /checkpoints/2021-11-29 22:45:10/checkpoint_epoch_19_F1wo_0.780_accwo_0.792_recallwo_0.769",
+  "model_path": "/home/wry/NLP_code/3-sequence_tagging /checkpoints/2021-11-30 13:23:17/checkpoint_epoch_19_F1_0.793_acc_0.663_recall_0.987_F1wo_0.858_accwo_0.832_recallwo_0.885",
   "results_dir": "./results/",
   "train_text_path": "data/train_corpus.txt",
   "test_text_path": "data/test_corpus.txt",

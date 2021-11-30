@@ -30,6 +30,9 @@ class BatchCRF(nn.Module):
         init_transitions = torch.zeros(self.tagset_size + 2, self.tagset_size + 2)
         init_transitions[:, self.START_TAG_IDX] = -1000.
         init_transitions[self.END_TAG_IDX, :] = -1000.
+        init_transitions[self.tag_to_ix['PAD'], :] = -1000.
+        init_transitions[self.tag_to_ix['PAD'], self.tag_to_ix['PAD']] = 0.
+        init_transitions[self.tag_to_ix['PAD'], self.END_TAG_IDX] = 0.
         init_transitions = init_transitions.cuda()
         self.transitions = nn.Parameter(init_transitions)
 
@@ -168,6 +171,7 @@ class BatchCRF(nn.Module):
 
     def forward(self, feats, mask=None):
         path_score, best_path = self._viterbi_decode(feats, mask)
+        best_path[mask==0] = self.tag_to_ix['PAD']
         return path_score, best_path
 
     def _score_sentence(self, scores, mask, tags):
