@@ -75,6 +75,7 @@ logging.info(conf)
 logging.info(optimizer)
 
 max_F1_wo = 0
+max_F1 = 0
 acc_list = []
 acc_wo_list = []
 recall_list = []
@@ -121,14 +122,18 @@ for epoch in tqdm(range(num_epoch)):
     loss_list.append(eval_info['loss'])
     epoch_list.append(epoch)
 
-    if epoch % num_epoch_val == 0 and eval_info['F1_wo'] > max_F1_wo:
-        max_F1_wo = eval_info['F1_wo']
+    if (epoch % num_epoch_val == 0 and (eval_info['F1_wo'] > max_F1_wo or eval_info['F1'] > max_F1)) or epoch == num_epoch - 1:
+        max_F1_wo = max(eval_info['F1_wo'], max_F1_wo)
+        max_F1 = max(eval_info['F1'], max_F1)
+
         state = {'model': model.state_dict(), 'optimizer': optimizer.state_dict(), 'step': step, 'lr': lr}
-        save_name = save_checkpoint_dir + '/' + time_flag + '/' + 'checkpoint_epoch_' + \
-                    str(epoch)[:5] + '_F1wo_' + \
-                    str(eval_info['F1_wo'])[:5] + '_accwo_' + \
-                    str(eval_info['acc_wo'])[:5] + '_recallwo_' + \
-                    str(eval_info['recall_wo'])[:5]
+        save_name = save_checkpoint_dir + '/' + time_flag + '/' + 'checkpoint_epoch_' + str(epoch)[:5] +\
+                    '_F1_' + str(eval_info['F1'])[:5] +\
+                    '_acc_' + str(eval_info['acc'])[:5] +\
+                    '_recall_' + str(eval_info['recall'])[:5] +\
+                    '_F1wo_' + str(eval_info['F1_wo'])[:5] +\
+                    '_accwo_' + str(eval_info['acc_wo'])[:5] +\
+                    '_recallwo_' + str(eval_info['recall_wo'])[:5]
         torch.save(state, save_name)
         logging.info('save model to: ' + save_name)
 
@@ -147,3 +152,4 @@ training_data_path = './training_data/train_data' + time_flag + '.pkl'
 with open(training_data_path, 'wb') as f:
     pkl.dump(training_data, f)
 print('Training data is saved to ' + train_pkl_path)
+print('Time flag: ' + str(time_flag))

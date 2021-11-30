@@ -3,7 +3,7 @@
   "test_pkl_path": "feature/test.pkl",
   "save_checkpoint_dir": "./checkpoints/",
   "save_figure_dir": "./figure/",
-  "model_path": "/home/wry/NLP_code/3-sequence_tagging /checkpoints/2021-11-29 20:35:32/checkpoint_epoch_9_F1wo_0.032_accwo_0.833_recallwo_0.016",
+  "model_path": "/home/wry/NLP_code/3-sequence_tagging /checkpoints/2021-11-29 22:45:10/checkpoint_epoch_19_F1wo_0.780_accwo_0.792_recallwo_0.769",
   "results_dir": "./results/",
   "train_text_path": "data/train_corpus.txt",
   "test_text_path": "data/test_corpus.txt",
@@ -15,7 +15,7 @@
   "num_epoch_val": 1,
   "lr": 0.01,
   "resume": 0,
-  "is_CRF": 0,
+  "is_CRF": 1,
   "base_model": "bert-large-cased",
   "num_val_set": 500
 }

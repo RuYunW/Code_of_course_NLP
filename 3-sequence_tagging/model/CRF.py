@@ -214,5 +214,5 @@ class BatchCRF(nn.Module):
         forward_score, scores = self._forward_alg(feats, mask)
         gold_score = self._score_sentence(scores, mask, tags)
         if self.average_batch:
-            return (forward_score - gold_score) / batch_size
+            return (forward_score - gold_score) / float(batch_size)
         return forward_score - gold_score

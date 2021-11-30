@@ -11,6 +11,7 @@ class BertLM(nn.Module):
         self.max_len = max_len
         self.hidden_dim = hidden_dim
         self.is_CRF = is_CRF
+        print('is_CRF: ', self.is_CRF)
         self.average_batch = average_batch
         self.tag_to_ix = {'O': 0, 'B-PER': 1, 'I-PER': 2, 'B-ORG': 3, 'I-ORG': 4, 'B-LOC': 5, 'I-LOC': 6, 'PAD': 7}
         self.tagset_size = len(self.tag_to_ix)
@@ -42,9 +43,10 @@ class BertLM(nn.Module):
         batch_size = feats.size(0)
         if self.is_CRF:
             loss_value = self.crf._neg_log_likelihood_loss(feats, mask, tags)
+            loss_value /= float(batch_size)
         else:
             loss_value = self._cross_entropy_loss(feats, tags)
-        # loss_value /= float(batch_size)
+        # loss_value /= float(1.0)
         return loss_value
 
     # def _feat_softmax(self, feat):
