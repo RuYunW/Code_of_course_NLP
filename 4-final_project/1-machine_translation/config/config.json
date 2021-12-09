@@ -1,0 +1,27 @@
+{
+  "train_en_set_path": "./data/en-zh/train.en",
+  "train_zh_set_path": "./data/en-zh/train.zh",
+  "val_en_set_path": "data/en-zh/valid.en",
+  "val_zh_set_path": "data/en-zh/valid.zh",
+  "test_en_set_path": "data/en-zh/test.en",
+  "test_zh_set_path": "data/en-zh/test.zh",
+
+  "checkpoints_dir": "./checkpoints/",
+  "log_dir": "./log/",
+  "features_dir": "./features/",
+  "figures_dir": "./figures/",
+  "results_dir": "./results/",
+  "vocab_dir": "./features/vocab/",
+  "sep_dir": "./features/sep/",
+  "ids_dir": "./features/ids/",
+  "model_path": "",
+
+  "batch_size": 5,
+  "num_epoch": 20,
+  "lr": 0.01,
+  "max_len": 64,
+  "en_vocab_size": 2000,
+  "zh_vocab_size": 2000,
+
+  "is_resume": 0
+}
