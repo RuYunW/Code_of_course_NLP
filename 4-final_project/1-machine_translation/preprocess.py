@@ -109,7 +109,7 @@ def sort_dict(vocab_dict: dict, vocab_size: int):
     return vocab, token2id, id2token
 
 
-def token_indexing(text_list, token2id, max_sen_len=None):
+def token_indexing(text_list, token2id):
     ids_list = []
     for sentence in tqdm(text_list):
         sen_ids = []
@@ -118,10 +118,6 @@ def token_indexing(text_list, token2id, max_sen_len=None):
                 sen_ids.append(token2id[token])
             else:
                 sen_ids.append(token2id['<UNK>'])
-        # if len(sen_ids) > max_sen_len:
-        #     sen_ids = sen_ids[:max_sen_len]
-        # else:
-        #     sen_ids += [token2id['<PAD>'] for i in range(max_sen_len - len(sen_ids))]
         ids_list.append(sen_ids)
     return ids_list
 
@@ -158,12 +154,18 @@ test_zh_text_list = zh_sep(test_zh_file_path)
 en_vocab, token2id_en, id2token_en = sort_dict(en_vocab, en_vocab_size)
 zh_vocab, token2id_zh, id2token_zh = sort_dict(zh_vocab, zh_vocab_size)
 
+# print(en_vocab)
+# print(token2id_en)
+
 ## Token indexing
 print('Token indexing...')
 # English
 train_en_ids_list = token_indexing(train_en_text_list, token2id_en)
 val_en_ids_list = token_indexing(val_en_text_list, token2id_en)
 test_en_ids_list = token_indexing(test_en_text_list, token2id_en)
+
+# print(test_en_ids_list)
+# exit()
 # Chinese
 train_zh_ids_list = token_indexing(train_zh_text_list, token2id_zh)
 val_zh_ids_list = token_indexing(val_zh_text_list, token2id_zh)

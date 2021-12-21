@@ -14,14 +14,22 @@
   "vocab_dir": "./features/vocab/",
   "sep_dir": "./features/sep/",
   "ids_dir": "./features/ids/",
-  "model_path": "",
+  "model_path": "/home/wry/NLP_code/4-final_project/1-machine_translation/checkpoints/2021-12-20 22:18:30/checkpoint_acc_0.003_loss_2225.",
 
-  "batch_size": 5,
+  "batch_size": 16,
   "num_epoch": 20,
   "lr": 0.01,
   "max_len": 64,
-  "en_vocab_size": 2000,
-  "zh_vocab_size": 2000,
+  "en_vocab_size": 5000,
+  "zh_vocab_size": 4000,
 
-  "is_resume": 0
+  "num_encoder_layers": 6,
+  "num_decoder_layers": 6,
+  "d_model": 512,
+  "num_heads": 8,
+  "d_inner": 2048,
+
+  "is_resume": 0,
+  "num_print": 50,
+  "save_step": 200
 }

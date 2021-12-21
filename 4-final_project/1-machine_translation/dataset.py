@@ -1,5 +1,6 @@
 from torch.utils.data import Dataset
 import torch
+from utils.utils import positional_embedding
 
 class BatchData(Dataset):
     def __init__(self, source_ids, target_ids, source_vocab_len, target_vocab_len, max_sen_len, source_token2id, target_token2id):
@@ -16,40 +17,27 @@ class BatchData(Dataset):
     def __len__(self):
         return len(self.source_ids)
 
-    def _get_mask(self, length):
-        mask = torch.ones(self.max_sen_len)
-        mask[length:] = 0
-        return mask
-
     def __getitem__(self, item):
         # source
-        source_ids = self.source_ids[item]
-        source_mask_tens = self._get_mask(len(source_ids))
+        source_ids = [self.source_token2id['<SOS>']] + self.source_ids[item] + [self.source_token2id['<EOS>']]
         if len(source_ids) > self.max_sen_len:
             source_ids = source_ids[:self.max_sen_len]
         else:
-            source_ids = source_ids+[self.source_token2id['<PAD>'] for _ in range(self.max_sen_len-len(source_ids))]
-        # # onehot
-        # source_tens = torch.zeros([self.max_sen_len, self.source_vocab_len]).long()
-        # for i, id in enumerate(source_ids):
-        #     source_tens[i][id] = 1.
+            source_ids = source_ids + [self.source_token2id['<PAD>'] for _ in range(self.max_sen_len-len(source_ids))]
 
         # target
         target_ids = [self.target_token2id['<SOS>']] + self.target_ids[item] + [self.target_token2id['<EOS>']]
-        target_mask_tens = self._get_mask(len(target_ids))
         if len(target_ids) > self.max_sen_len:
             target_ids = target_ids[:self.max_sen_len]
         else:
             target_ids = target_ids+[self.target_token2id['<PAD>'] for _ in range(self.max_sen_len-len(target_ids))]
-        # # onehot
-        # target_tens = torch.zeros([self.max_sen_len, self.target_vocab_len]).long()
-        # for i, id in enumerate(target_ids):
-        #     target_tens[i][id] = 1.
 
+        PE = positional_embedding()
         data_info = {'source_ids': torch.tensor(source_ids).to(self.device),
                      'target_ids': torch.tensor(target_ids).to(self.device),
-                     'source_mask_tens': source_mask_tens.to(self.device),
-                     'target_mask_tens': target_mask_tens.to(self.device),
+                     'PE': PE
+                     # 'source_mask_tens': source_mask_tens.to(self.device),
+                     # 'target_mask_tens': target_mask_tens.to(self.device),
                      }
 
         return data_info
