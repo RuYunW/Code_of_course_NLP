@@ -34,8 +34,8 @@ class BatchData(Dataset):
 
         PE = positional_embedding()
         data_info = {'source_ids': torch.tensor(source_ids).to(self.device),
-                     'target_ids': torch.tensor(target_ids).to(self.device),
-                     'PE': PE
+                     'target_ids': torch.tensor(target_ids).to(self.device)
+                     # 'PE': PE
                      # 'source_mask_tens': source_mask_tens.to(self.device),
                      # 'target_mask_tens': target_mask_tens.to(self.device),
                      }

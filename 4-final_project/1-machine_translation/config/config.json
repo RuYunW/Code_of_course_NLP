@@ -14,7 +14,7 @@
   "vocab_dir": "./features/vocab/",
   "sep_dir": "./features/sep/",
   "ids_dir": "./features/ids/",
-  "model_path": "/home/wry/NLP_code/4-final_project/1-machine_translation/checkpoints/2021-12-20 22:18:30/checkpoint_acc_0.003_loss_2225.",
+  "model_path": "/home/wry/NLP_code/4-final_project/1-machine_translation/checkpoints/2021-12-21 22:25:33/checkpoint_epoch_0_step_2000_acc_1.0_loss_202.750",
 
   "batch_size": 16,
   "num_epoch": 1,
@@ -31,5 +31,6 @@
 
   "is_resume": 0,
   "num_print": 50,
-  "save_step": 200
+  "save_step": 200,
+  "beam_size": 5
 }

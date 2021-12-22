@@ -1,26 +1,19 @@
-import torch
 import time
-import logging
 import json
+import torch
+import logging
 import pickle as pkl
-import numpy as np
-import torch.optim as optim
+from tqdm import tqdm
+from torch.optim import Adam
 from dataset import BatchData
 from torch.utils.data import DataLoader
-# from transformer.Models import Transformer
 from model.transformer import Transformer
 from model.transformer import ScheduledOptim
-# from model.translator import Translator
-from torch.optim import Adam
-from tqdm import tqdm
-from utils.utils import val_acc, cal_loss, create_dir_not_exist
-# from utils.utils import eval
-import torch.nn.functional as F
-from torch.nn import CrossEntropyLoss
+from utils.utils import val_acc, cal_loss, create_dir_not_exist, save_np_file
+
 
 torch.manual_seed(1)
 time_flag = time.strftime("%Y-%m-%d %H:%M:%S")
-
 conf_p = "config/config.json"
 with open(conf_p, "r") as f:
     conf = json.load(f)
@@ -43,7 +36,7 @@ results_dir = conf['results_dir']
 # hyper-parameters
 batch_size = conf['batch_size']
 num_epoch = conf['num_epoch']
-lr = conf['lr']
+# lr = conf['lr']
 max_len = conf['max_len']
 en_vocab_size = conf['en_vocab_size']
 zh_vocab_size = conf['zh_vocab_size']
@@ -52,6 +45,8 @@ num_decoder_layers = conf['num_decoder_layers']
 d_model = conf['d_model']
 num_heads = conf['num_heads']
 d_inner = conf['d_inner']
+
+num_vals = 1000
 
 is_resume = bool(conf['is_resume'])
 num_print = conf['num_print']
@@ -82,16 +77,16 @@ with open(ids_dir+'train_zh_ids.pkl', 'rb') as f:
     train_zh_ids = pkl.load(f)
 assert len(train_en_ids) == len(train_zh_ids), 'Train: The length of en and zh are not equal. '
 with open(ids_dir+'val_en_ids.pkl', 'rb') as f:
-    val_en_ids = pkl.load(f)
+    val_en_ids = pkl.load(f)[:num_vals]
 with open(ids_dir+'val_zh_ids.pkl', 'rb') as f:
-    val_zh_ids = pkl.load(f)
+    val_zh_ids = pkl.load(f)[:num_vals]
 assert len(val_en_ids) == len(val_zh_ids), 'Val: The length of en and zh are not equal. '
 
 train_dataset = BatchData(train_en_ids, train_zh_ids, en_vocab_size, zh_vocab_size, max_len, token2id_en, token2id_zh)
 val_dataset = BatchData(val_en_ids, val_zh_ids, en_vocab_size, zh_vocab_size, max_len, token2id_en, token2id_zh)
 
-train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
-val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True)
 
 print('num train samples: ', len(train_en_ids))
 print('num val samples: ', len(val_en_ids))
@@ -103,16 +98,17 @@ model = Transformer(num_enc_layers=num_encoder_layers, num_dec_layers=num_decode
 model.to(device)
 print('device: ' + str(device))
 
-# optimizer = Adam(model.parameters(), betas=(0.9, 0.98), eps=1e-09)
 optimizer = ScheduledOptim(
         Adam(model.parameters(), betas=(0.9, 0.98), eps=1e-09),
         lr_mul=2.0, d_model=512, n_warmup_steps=4000)
-# criteria = CrossEntropyLoss()
+
 create_dir_not_exist(checkpoints_dir + time_flag + '/')
 print('Checkpoints will be saved into ' + checkpoints_dir + time_flag + '/')
-# save training acc scores
 create_dir_not_exist(results_dir + time_flag + '/')
 print('Results will be saved at: ' + results_dir + time_flag + '/')
+
+
+
 ## train
 model.train()
 total_steps = len(train_loader)
@@ -121,6 +117,10 @@ val_best_loss = 10000
 val_iter_data = iter(val_loader)
 train_accs = []
 val_accs = []
+val_losss = []
+val_bleus = []
+train_losss = []
+
 for epoch in tqdm(range(num_epoch)):
     step = 0
     # train
@@ -129,17 +129,17 @@ for epoch in tqdm(range(num_epoch)):
         # inputs
         src_ids = batch_data['source_ids']
         tgt_ids = batch_data['target_ids']
-        PE = batch_data['PE']
         # predict
         pred = model(src_ids, tgt_ids)
         # scores
         loss = cal_loss(pred, tgt_ids, is_smoothing=True)
         acc = val_acc(model, batch_data)
+        train_losss.append(loss)
         train_accs.append(acc)
         # print
         if step % num_print == 0:
-            print_info = 'Training: epoch: {} / {}|    step: {} / {}|    loss: {}|    acc: {}%'.format(
-                epoch, num_epoch, step, total_steps, loss.item(), float('%.2f'%(acc*100)))
+            print_info = 'Training: epoch: {} / {}|    step: {} / {}|    loss: {}|    Acc: {}%'.format(
+                epoch, num_epoch, step, total_steps, float('%.2f'%loss.item()), float('%.2f'%(acc*100)))
             print(print_info)
             logging.info(print_info)
         # backward
@@ -156,21 +156,23 @@ for epoch in tqdm(range(num_epoch)):
             val_pred = model(val_src_ids, val_tgt_ids)
             # scores
             val_set_loss = cal_loss(val_pred, val_tgt_ids, is_smoothing=True)
-            val_set_acc = val_acc(model, val_batch_data)
+            val_set_acc, val_set_bleu = val_acc(model, val_batch_data, cal_bleu=True)
+            print('Val: epoch: {} / {}|    step: {} / {}|    Loss: {}|    Acc: {}%|    BLEU: {}%|'.format(
+                    epoch, num_epoch, step, total_steps, float('%.2f'%val_set_loss.item()), float('%.2f'%(val_set_acc*100)), float('%.2f'%(val_set_bleu*100))))
+            val_losss.append(val_set_loss)
             val_accs.append(val_set_acc)
+            val_bleus.append(val_set_bleu)
             # save train acc
-            train_acc_save_name = results_dir + time_flag + '/train_acc_scores' + '_epoch_' + str(epoch) \
-                                  + '_step_' + str(step) + '.npy'
-            np.save(train_acc_save_name, np.array(train_accs))
-            print('Training Acc scores has been saved at: ' + train_acc_save_name)
-            # save val acc
-            val_acc_save_name = results_dir + time_flag + '/val_acc_scores' + '_epoch_' + str(epoch) \
-                                + '_step_' + str(step) + '.npy'
-            np.save(val_acc_save_name, np.array(val_accs))
-            print('Val Acc scores has been saved at: ' + val_acc_save_name)
+            save_scores_dir = results_dir + time_flag
+            save_np_file(save_scores_dir+'/train_acc_scores.npy', train_accs)
+            save_np_file(save_scores_dir+'/train_loss.npy', train_losss)
+            save_np_file(save_scores_dir+'/val_acc_scores.npy', val_accs)
+            save_np_file(save_scores_dir+'/val_loss.npy', val_losss)
+            save_np_file(save_scores_dir+'/val_bleu_scores.npy', val_bleus)
+            print('Acc and loss of training and val has been saved at: ' + save_scores_dir + '/')
 
             # if best, save
-            if val_best_acc <= val_set_acc or val_best_loss <= val_set_loss:
+            if val_best_acc <= val_set_acc or val_best_loss >= val_set_loss.item():
                 # update
                 val_best_acc = max(val_best_acc, val_set_acc)
                 val_best_loss = min(val_best_loss, val_set_loss.item())
@@ -179,11 +181,10 @@ for epoch in tqdm(range(num_epoch)):
                 logging.info('Val: epoch: {} / {}|    step: {} / {}|    acc: {}|    loss: {}|'.format(
                     epoch, num_epoch, step, total_steps, val_set_acc, val_set_loss.item()))
                 # save
-                lr = optimizer._optimizer.param_groups[0]['lr']
-                state = {'model': model.state_dict(), 'optimizer': optimizer, 'epoch': epoch, 'step': step, 'lr': lr,
-                         'time_flag': str(time_flag)}
-                save_name = checkpoints_dir + time_flag + '/' + 'checkpoint'+'_epoch_'+str(epoch)+'_step_'+str(step)\
-                            +'_acc_' + str(val_set_acc)[:5] + '_loss_' + str(val_set_loss.item())[:7]
+                # lr = optimizer._optimizer.param_groups[0]['lr']
+                state = {'model': model.state_dict(), 'optimizer': optimizer, 'time_flag': str(time_flag)}
+                save_name = checkpoints_dir + time_flag + '/' + 'epoch_'+str(epoch)+'_step_'+str(step)\
+                            +'_acc_' + str(val_set_acc)[:5] + '_loss_' + str(val_set_loss.item())[:7] + '.checkpoint'
                 torch.save(state, save_name)
                 print('checkpoint has been saved at: ' + save_name)
 

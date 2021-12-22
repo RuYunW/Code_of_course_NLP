@@ -26,6 +26,8 @@ ids_dir = conf['ids_dir']
 results_dir = conf['results_dir']
 en_vocab_size = conf['en_vocab_size']
 zh_vocab_size = conf['zh_vocab_size']
+beam_size = conf['beam_size']
+
 
 
 with open(vocab_dir+'token2id_en.json', 'r') as f:
@@ -47,7 +49,7 @@ test_dataset = BatchData(test_en_ids, test_zh_ids, en_vocab_size, zh_vocab_size,
 test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-model = Transformer()
+model = Transformer(max_sen_len=max_len, input_size=en_vocab_size+4, output_size=zh_vocab_size+4)
 
 model_param = torch.load(model_path)
 model.load_state_dict(model_param['model'])
@@ -56,7 +58,13 @@ model.to(device)
 print('device: ' + str(device))
 model.eval()
 
-translator = Translator(model, id2token_zh)
+# for batch_data in test_loader:
+#     src_ids = batch_data['source_ids']
+#     tgt_ids = batch_data['target_ids']
+#     pred = model(src_ids, tgt_ids)
+#     exit()
+
+translator = Translator(model, id2token_zh, max_sen_len=max_len, beam_size=beam_size)
 translator.to(device)
 
 sources = []

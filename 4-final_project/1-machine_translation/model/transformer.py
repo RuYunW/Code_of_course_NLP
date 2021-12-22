@@ -17,18 +17,8 @@ class Transformer(nn.Module):
     def __init__(self, num_enc_layers=6, num_dec_layers=6, max_sen_len=64, d_model=512,
                  input_size=2000+4, output_size=2000+4, pad_idx=2, dropout=0.1, num_heads=8, d_inner=2048):
         super(Transformer, self).__init__()
-        # self.num_enc_layers = num_enc_layers
-        # self.num_dec_layers = num_dec_layers
-        # self.max_sen_len = max_sen_len
-        # self.d_model = d_model
-        # self.input_size = input_size
-        # self.output_size = output_size
         self.pad_idx = pad_idx
-        self.PE = positional_embedding()
-        # self.dropout = dropout
-        # self.is_eval = is_eval
-        self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-        print(self.device)
+        self.PE = positional_embedding(max_sen_len=max_sen_len, d_model=d_model)
 
         # Networks
         self.src_embedding = nn.Embedding(input_size, d_model)
@@ -42,10 +32,6 @@ class Transformer(nn.Module):
                          dropout=dropout) for _ in range(num_dec_layers)
         ])
         self.linear = nn.Linear(d_model, output_size)
-        # self.linear = nn.Sequential(
-        #     nn.Linear(d_model, 2048),
-        #     nn.Linear(2048, output_size)
-        # )
         self.dropout = nn.Dropout(dropout)
         self.layer_norm = nn.LayerNorm(d_model, eps=1e-6)
 
@@ -61,10 +47,6 @@ class Transformer(nn.Module):
         return subsequent_mask
 
     def forward(self, src_ids, tgt_ids):
-        # src_ids = data['source_ids']
-        # tgt_ids = data['target_ids']
-        # PE = data['PE']
-
         # Encoder Embedding
         src_emb = self.src_embedding(src_ids)
         src_pos = self.PE
@@ -97,7 +79,8 @@ class EncoderBlock(nn.Module):
         self.d_model = d_model
 
         # networks
-        self.multi_head_attention = MultiHeadAttention(d_model=d_model, num_heads=num_heads, max_sen_len=max_sen_len, dropout=dropout)
+        self.multi_head_attention = MultiHeadAttention(d_model=d_model, num_heads=num_heads,
+                                                       max_sen_len=max_sen_len, dropout=dropout)
         self.linear = nn.Linear(d_model, d_model)
         self.feedforward = nn.Sequential(
             nn.Linear(self.d_model, d_inner),
@@ -129,7 +112,6 @@ class DecoderBlock(nn.Module):
         super(DecoderBlock, self).__init__()
         self.d_model = d_model
         self.max_len_sen = max_sen_len
-        # self.is_eval = is_eval
 
         # network
         self.masked_multi_head_attention = MaskedMultiHeadAttention(d_model=d_model, num_heads=num_heads, max_sen_len=max_sen_len, dropout=dropout)
@@ -171,7 +153,6 @@ class MultiHeadAttention(nn.Module):
         self.d_q = int(d_model / num_heads)
         self.d_k = int(d_model / num_heads)
         self.d_v = int(d_model / num_heads)
-        self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
         # networks
         self.W_Q = nn.Linear(d_model, num_heads * self.d_k, bias=False)
@@ -219,12 +200,9 @@ class MaskedMultiHeadAttention(nn.Module):
         self.num_heads = num_heads
         self.d_model = d_model
         self.max_sen_len = max_sen_len
-        # self.dropout = dropout
-        # self.is_eval = is_eval
         self.d_q = int(d_model / num_heads)
         self.d_k = int(d_model / num_heads)
         self.d_v = int(d_model / num_heads)
-        self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
         # networks
         self.W_Q = nn.Linear(self.d_model, self.num_heads * self.d_k, bias=False)
@@ -245,8 +223,6 @@ class MaskedMultiHeadAttention(nn.Module):
         len_k = input_tens.size(1)
         len_v = input_tens.size(1)
 
-        # print(input_tens.shape)  # torch.Size([1, 1, 512])
-        # exit()
         Q = self.W_Q(input_tens).view(batch_size, len_q, self.num_heads, self.d_k)
         K = self.W_K(input_tens).view(batch_size, len_k, self.num_heads, self.d_k)
         V = self.W_V(input_tens).view(batch_size, len_v, self.num_heads, self.d_v)
