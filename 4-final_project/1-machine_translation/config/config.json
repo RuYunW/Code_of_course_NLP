@@ -17,8 +17,8 @@
   "model_path": "/home/wry/NLP_code/4-final_project/1-machine_translation/checkpoints/2021-12-20 22:18:30/checkpoint_acc_0.003_loss_2225.",
 
   "batch_size": 16,
-  "num_epoch": 20,
-  "lr": 0.01,
+  "num_epoch": 1,
+  "lr": 0.001,
   "max_len": 64,
   "en_vocab_size": 5000,
   "zh_vocab_size": 4000,
