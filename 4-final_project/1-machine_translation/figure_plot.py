@@ -1,45 +1,71 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import json
-import torch
-import os
-import re
+# import torch
+# import os
+# import re
 
 # Config
 conf_p = "config/config.json"
 with open(conf_p, "r") as fc:
     conf = json.load(fc)
-model_path = conf['model_path']
+# model_path = conf['model_path']
 results_dir = conf['results_dir']
 figures_dir = conf['figures_dir']
 
-model_param = torch.load(model_path, map_location=lambda storage, loc: storage)  # to(cpu)
-time_flag = model_param['time_flag']
+# time_flag = '2021-12-24 12%3A20%3A05'
+# time_flag = '2021-12-24 12%3A38%3A18'
+# time_flag = '2021-12-24 21%3A44%3A19'
+time_flag = '2021-12-24 22%3A26%3A57'
 
-# val_acc_save_name = results_dir + time_flag + '/val_acc_scores' + '_epoch_' + str(epoch) \
-#                                 + '_step_' + str(step) + '.npy'
+results_time_flag = './results/'+time_flag + '/'
+train_acc_path = results_time_flag + 'train_acc_scores.npy'
+train_acc = np.load(train_acc_path)
 
-acc_save_name_list = os.listdir(results_dir + time_flag)
-acc_save_name_list.sort(key= lambda x:int(re.findall(r'scores_epoch_0_step_(.*?).npy', x)[0]))
-val_acc_scores_name, train_acc_scores_name = acc_save_name_list[-2], acc_save_name_list[-1]
+# train_loss_path = time_flag + 'train_loss.npy'
+# train_loss = np.load(train_loss_path, allow_pickle=True)
 
-val_accs = np.load(results_dir + time_flag+'/'+val_acc_scores_name)
-train_accs = np.load(results_dir + time_flag + '/' + train_acc_scores_name)
+val_acc_path = results_time_flag + 'val_acc_scores.npy'
+val_acc = np.load(val_acc_path)
+
+val_bleu_path = results_time_flag + 'val_bleu_scores.npy'
+val_bleu = np.load(val_bleu_path)
+
+print(max(val_bleu))
+print(val_bleu.mean())
+# val_loss_path = time_flag + 'val_loss.npy'
+# val_loss = np.load(val_loss_path)
 
 
-# print(val_accs)
-# print(len(val_accs))
-# x = np.arange(0, len(val_accs)*200, 200)
-# print(x)
+#
+# train_acc = read_npy(train_acc_path)
+# train_loss = read_npy(train_loss_path)
+# val_acc = read_npy(val_acc_path)
+# val_bleu = read_npy(val_bleu_path)
+# val_loss = read_npy(val_loss_path)
+# exit()
+# model_param = torch.load(model_path, map_location=lambda storage, loc: storage)  # to(cpu)
+# time_flag = model_param['time_flag']
 
-plt.plot(train_accs)
-plt.plot(np.arange(0, len(val_accs)*200, 200), val_accs, color='red', linewidth='1')
-plt.legend(['train', 'val'])
+# print(len(train_acc))
+train_x = np.arange(0, len(train_acc)*10, 10)
+val_x = np.arange(0, len(val_acc)*2000, 2000)
+
+
+plt.plot(train_x, train_acc)
+# plt.plot(train_x, train_loss)
+plt.plot(val_x, val_acc)
+plt.plot(val_x, val_bleu)
+# plt.plot(val_x, val_loss)
+# plt.plot(, val_accs, color='red', linewidth='1')
+plt.legend(['train acc', 'val acc', 'val bleu'])
 plt.xlabel('Steps')
-plt.ylabel('Acc')
-plt.title('Acc scores in training.')
+plt.ylabel('Score')
+plt.title('Acc and BLEU scores in training.')
 # plt.xticks()
-plt.savefig(figures_dir+'/'+val_acc_scores_name+'.png')
+# from utils.utils import create_dir_not_exist
+# create_dir_not_exist()
+plt.savefig(figures_dir + 'results_plot_' + time_flag + '.png')
 # print(acc_save_name_list)
 # val_accs = np.load()
 

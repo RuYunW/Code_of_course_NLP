@@ -150,12 +150,11 @@ train_zh_text_list = zh_sep(train_zh_file_path)
 val_zh_text_list = zh_sep(val_zh_file_path)
 test_zh_text_list = zh_sep(test_zh_file_path)
 
+logging.info({'original en vocab size: {}, original zh vocab size: {}'.format(len(en_vocab), len(zh_vocab))})
 ## Vocab
 en_vocab, token2id_en, id2token_en = sort_dict(en_vocab, en_vocab_size)
 zh_vocab, token2id_zh, id2token_zh = sort_dict(zh_vocab, zh_vocab_size)
 
-# print(en_vocab)
-# print(token2id_en)
 
 ## Token indexing
 print('Token indexing...')

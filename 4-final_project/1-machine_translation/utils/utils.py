@@ -1,4 +1,6 @@
 from tqdm import tqdm
+from torch.utils.data import Dataset
+from torch.utils.data import DataLoader
 import torch
 import os
 import math
@@ -47,27 +49,50 @@ def _get_subsequent_mask(ids):
     return subsequent_mask
 
 
-def cal_loss(pred, gold, pad_idx=2, is_smoothing=False):
+# def cal_loss(pred, gold, pad_idx=2, is_smoothing=True):
+#     gold = gold.contiguous().view(-1)
+#     if is_smoothing:
+#         eps = 0.1
+#         n_class = pred.size(1)
+#         one_hot = torch.zeros_like(pred).scatter(1, gold.view(-1, 1), 1)
+#         one_hot = one_hot * (1 - eps) + (1 - one_hot) * eps / (n_class - 1)
+#         log_prb = F.log_softmax(pred, dim=1)
+#         log_prb = torch.clamp(log_prb, max=-5e-5)
+#         non_pad_mask = gold.ne(pad_idx)
+#         loss = -(one_hot * log_prb).sum(dim=1)
+#         loss = loss.masked_select(non_pad_mask).sum()  # average later
+#     else:
+#         loss = F.cross_entropy(pred, gold, ignore_index=pad_idx, reduction='sum')
+#     return loss
+
+def cal_loss(pred, gold, trg_pad_idx=2, is_smoothing=True):
+    ''' Calculate cross entropy loss, apply label smoothing if needed. '''
+
     gold = gold.contiguous().view(-1)
+
     if is_smoothing:
         eps = 0.1
         n_class = pred.size(1)
+
         one_hot = torch.zeros_like(pred).scatter(1, gold.view(-1, 1), 1)
         one_hot = one_hot * (1 - eps) + (1 - one_hot) * eps / (n_class - 1)
         log_prb = F.log_softmax(pred, dim=1)
-        non_pad_mask = gold.ne(pad_idx)
+
+        non_pad_mask = gold.ne(trg_pad_idx)
         loss = -(one_hot * log_prb).sum(dim=1)
         loss = loss.masked_select(non_pad_mask).sum()  # average later
     else:
-        loss = F.cross_entropy(pred, gold, ignore_index=pad_idx, reduction='sum')
+        loss = F.cross_entropy(pred, gold, ignore_index=trg_pad_idx, reduction='sum')
     return loss
 
-
-def val_acc(model, batch_data, pad_idx=2, cal_bleu=False):
-    model.eval()
-    src_ids = batch_data['source_ids']
-    tgt_ids = batch_data['target_ids']
-    pred = model(src_ids, tgt_ids)
+cpu_device = torch.device('cpu')
+def val_acc(pred, tgt_ids, pad_idx=2, cal_bleu=False):
+    # model.eval()
+    # model.to(cpu_device)
+    # with torch.no_grad:
+    # src_ids = batch_data['source_ids']
+    # tgt_ids = batch_data['target_ids']
+    # pred = model(src_ids, tgt_ids)
     n_correct, n_word = cal_correct(pred.cpu(), tgt_ids.cpu(), pad_idx=pad_idx)
     acc = (n_correct+1) / (n_word+1)  # avoid being divided by zero
     if cal_bleu:
@@ -76,13 +101,21 @@ def val_acc(model, batch_data, pad_idx=2, cal_bleu=False):
     return acc
 
 
-def cal_batch_bleu(pred, gold, pad_idx=2):
-    batch_size = int(gold.size(0))
+def cal_batch_bleu(pred, gold, batch_size, pad_idx=2):
+    # batch_size = int(gold.size(0))
+    pred = pred.view(batch_size, int(pred.size(0)/batch_size), -1)
+    gold = gold.view(batch_size, int(gold.size(0)/batch_size), -1)
+
     pred = pred.max(1)[1].view(batch_size, -1)
     pred = list(filter(not_pad, pred.tolist()))
     gold = list(filter(not_pad, gold.tolist()))
     bleu_list = [sentence_bleu([list(map(str, gold[i]))], list(map(str, pred[i]))) for i in range(batch_size)]
     return np.array(bleu_list).mean()
+
+# def cal_batch_bleu(pred, gold, batch_size):
+#     pred = pred.view(batch_size, )
+
+
 
 def cal_correct(pred, gold, pad_idx=2):
     pred = pred.max(1)[1]
@@ -140,6 +173,70 @@ def save_np_file(file_path, scores_list):
     scores_list = np.array(scores_list)
     np.save(file_path, np.array(scores_list))
     # print('Training loss has been saved at: ' + file_path)
+
+class BatchData(Dataset):
+    def __init__(self, source_ids, target_ids,  max_src_len, max_tar_len):
+        assert len(source_ids) == len(target_ids), 'The length of source data and target data are not equal to the target data. '
+        self.source_ids = source_ids
+        self.target_ids = target_ids
+        self.max_src_len = max_src_len
+        self.max_tar_len = max_tar_len + 1
+        self.sos_id = 0
+        self.eos_id = 1
+        self.pad_id = 2
+        self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+
+    def __len__(self):
+        return len(self.source_ids)
+
+    def __getitem__(self, item):
+        # source
+        source_ids = [self.sos_id] + self.source_ids[item] + [self.eos_id]
+        if len(source_ids) > self.max_src_len:
+            source_ids = source_ids[:self.max_src_len]
+        else:
+            source_pad_ids = [self.pad_id] * (self.max_src_len-len(source_ids))
+            source_ids = source_ids + source_pad_ids
+
+        # target
+        target_ids = [self.sos_id] + self.target_ids[item] + [self.eos_id]
+        if len(target_ids) > self.max_tar_len:
+            target_ids = target_ids[:self.max_tar_len]
+        else:
+            target_pad_ids = [self.pad_id] * (self.max_tar_len - len(target_ids))
+            target_ids = target_ids + target_pad_ids
+
+        data_info = {'source_ids': torch.tensor(source_ids).to(self.device),
+                     'target_ids': torch.tensor(target_ids).to(self.device)}
+
+        return data_info
+
+def get_iter(source_ids, target_ids, max_sen_len, batch_size, shuffle=False):
+    max_src_len = max([len(s) for s in source_ids])+2
+    max_tar_len = max([len(t) for t in target_ids])+2
+    max_src_len = min(max_sen_len, max_src_len)
+    max_tar_len = min(max_sen_len, max_tar_len)
+    dataset = BatchData(source_ids, target_ids, max_src_len, max_tar_len)
+    loader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
+    data_iter = iter(loader)
+    data = data_iter.next()
+    return data
+
+
+def cal_performance(pred, gold, trg_pad_idx, smoothing=True):
+    ''' Apply label smoothing if needed '''
+
+    loss = cal_loss(pred, gold, trg_pad_idx, is_smoothing=smoothing)
+
+    pred = pred.max(1)[1]
+    gold = gold.contiguous().view(-1)
+    non_pad_mask = gold.ne(trg_pad_idx)
+    n_correct = pred.eq(gold).masked_select(non_pad_mask).sum().item()
+    n_word = non_pad_mask.sum().item()
+
+    return loss, n_correct, n_word
+
+
 
 
 

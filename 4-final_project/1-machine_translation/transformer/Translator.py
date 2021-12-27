@@ -11,7 +11,7 @@ class Translator(nn.Module):
 
     def __init__(
             self, model, beam_size, max_seq_len,
-            src_pad_idx, trg_pad_idx, trg_sos_idx, trg_eos_idx):
+            src_pad_idx, trg_pad_idx, trg_bos_idx, trg_eos_idx):
         
 
         super(Translator, self).__init__()
@@ -20,17 +20,17 @@ class Translator(nn.Module):
         self.beam_size = beam_size
         self.max_seq_len = max_seq_len
         self.src_pad_idx = src_pad_idx
-        self.trg_sos_idx = trg_sos_idx
+        self.trg_bos_idx = trg_bos_idx
         self.trg_eos_idx = trg_eos_idx
 
         self.model = model
         self.model.eval()
 
-        self.register_buffer('init_seq', torch.LongTensor([[trg_sos_idx]]))
+        self.register_buffer('init_seq', torch.LongTensor([[trg_bos_idx]]))
         self.register_buffer(
             'blank_seqs', 
             torch.full((beam_size, max_seq_len), trg_pad_idx, dtype=torch.long))
-        self.blank_seqs[:, 0] = self.trg_sos_idx
+        self.blank_seqs[:, 0] = self.trg_bos_idx
         self.register_buffer(
             'len_map', 
             torch.arange(1, max_seq_len + 1, dtype=torch.long).unsqueeze(0))
@@ -38,6 +38,11 @@ class Translator(nn.Module):
 
     def _model_decode(self, trg_seq, enc_output, src_mask):
         trg_mask = get_subsequent_mask(trg_seq)
+        # print(trg_seq.shape)  # torch.Size([1, 1])
+        # print(trg_mask.shape)  # torch.Size([1, 1, 1])
+        # print(enc_output.shape)  # torch.Size([1, 11, 512])
+        # print(src_mask.shape)  # torch.Size([1, 1, 11])
+        # exit()
         dec_output, *_ = self.model.decoder(trg_seq, trg_mask, enc_output, src_mask)
         return F.softmax(self.model.trg_word_prj(dec_output), dim=-1)
 
@@ -87,12 +92,15 @@ class Translator(nn.Module):
         # Only accept batch size equals to 1 in this function.
         # TODO: expand to batch operation.
         assert src_seq.size(0) == 1
-
+        # print(src_seq.shape)
+        # exit()
         src_pad_idx, trg_eos_idx = self.src_pad_idx, self.trg_eos_idx 
         max_seq_len, beam_size, alpha = self.max_seq_len, self.beam_size, self.alpha 
 
         with torch.no_grad():
-            src_mask = get_pad_mask(src_seq, src_pad_idx)
+            src_mask = get_pad_mask(src_seq, src_pad_idx)  # torch.Size([1, 1, 11])
+            # print(src_mask.shape)
+            # exit()
             enc_output, gen_seq, scores = self._get_init_state(src_seq, src_mask)
 
             ans_idx = 0   # default

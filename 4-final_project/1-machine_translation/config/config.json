@@ -14,23 +14,24 @@
   "vocab_dir": "./features/vocab/",
   "sep_dir": "./features/sep/",
   "ids_dir": "./features/ids/",
-  "model_path": "/home/wry/NLP_code/4-final_project/1-machine_translation/checkpoints/2021-12-21 22:25:33/checkpoint_epoch_0_step_2000_acc_1.0_loss_202.750",
+  "model_path": "/home/wry/NLP_code/4-final_project/1-machine_translation/checkpoints/2021-12-27 14:48:33/epoch_0_step_8000_acc_0.846_bleu_0.262_loss_1083.06.checkpoint",
 
   "batch_size": 16,
-  "num_epoch": 1,
+  "num_epoch": 50,
   "lr": 0.001,
   "max_len": 64,
-  "en_vocab_size": 5000,
-  "zh_vocab_size": 4000,
+  "en_vocab_size": 60000,
+  "zh_vocab_size": 40000,
 
   "num_encoder_layers": 6,
   "num_decoder_layers": 6,
   "d_model": 512,
   "num_heads": 8,
   "d_inner": 2048,
+  "warmup_step": 128000,
 
   "is_resume": 0,
   "num_print": 50,
-  "save_step": 200,
+  "save_step": 4000,
   "beam_size": 5
 }

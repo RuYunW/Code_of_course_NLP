@@ -1,5 +1,7 @@
+import re
 import time
 import json
+import math
 import torch
 import logging
 import pickle as pkl
@@ -7,9 +9,12 @@ from tqdm import tqdm
 from torch.optim import Adam
 from dataset import BatchData
 from torch.utils.data import DataLoader
+from model.translator import Translator
 from model.transformer import Transformer
+# from model.zhihu import Transformer
+# from transformer.Models import Transformer
 from model.transformer import ScheduledOptim
-from utils.utils import val_acc, cal_loss, create_dir_not_exist, save_np_file
+from utils.utils import val_acc, cal_loss, create_dir_not_exist, save_np_file, from_ids_to_seq, get_iter, cal_performance, cal_batch_bleu
 
 
 torch.manual_seed(1)
@@ -36,6 +41,7 @@ results_dir = conf['results_dir']
 # hyper-parameters
 batch_size = conf['batch_size']
 num_epoch = conf['num_epoch']
+warmup_step = conf['warmup_step']
 # lr = conf['lr']
 max_len = conf['max_len']
 en_vocab_size = conf['en_vocab_size']
@@ -45,16 +51,13 @@ num_decoder_layers = conf['num_decoder_layers']
 d_model = conf['d_model']
 num_heads = conf['num_heads']
 d_inner = conf['d_inner']
+beam_size = conf['beam_size']
 
-num_vals = 1000
+# num_vals = 102000
 
 is_resume = bool(conf['is_resume'])
 num_print = conf['num_print']
 save_step = conf['save_step']
-
-if is_resume:
-    model_path = conf['model_path']
-
 
 ## Log
 logging.basicConfig(level=logging.DEBUG,
@@ -77,64 +80,99 @@ with open(ids_dir+'train_zh_ids.pkl', 'rb') as f:
     train_zh_ids = pkl.load(f)
 assert len(train_en_ids) == len(train_zh_ids), 'Train: The length of en and zh are not equal. '
 with open(ids_dir+'val_en_ids.pkl', 'rb') as f:
-    val_en_ids = pkl.load(f)[:num_vals]
+    val_en_ids = pkl.load(f)
 with open(ids_dir+'val_zh_ids.pkl', 'rb') as f:
-    val_zh_ids = pkl.load(f)[:num_vals]
+    val_zh_ids = pkl.load(f)
 assert len(val_en_ids) == len(val_zh_ids), 'Val: The length of en and zh are not equal. '
 
-train_dataset = BatchData(train_en_ids, train_zh_ids, en_vocab_size, zh_vocab_size, max_len, token2id_en, token2id_zh)
-val_dataset = BatchData(val_en_ids, val_zh_ids, en_vocab_size, zh_vocab_size, max_len, token2id_en, token2id_zh)
+# train_dataset = BatchData(train_en_ids, train_zh_ids, max_len)
+val_dataset = BatchData(val_en_ids, val_zh_ids, max_len)
 
-train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+# train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True)
 
 print('num train samples: ', len(train_en_ids))
 print('num val samples: ', len(val_en_ids))
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+cpu_device = torch.device('cpu')
 model = Transformer(num_enc_layers=num_encoder_layers, num_dec_layers=num_decoder_layers, max_sen_len=max_len,
                     d_model=d_model, input_size=en_vocab_size+4, output_size=zh_vocab_size+4,
                     num_heads=num_heads, d_inner=d_inner)
-model.to(device)
-print('device: ' + str(device))
-
+# model = Transformer(src_pad_idx=2, trg_pad_idx=2, trg_sos_idx=0, enc_voc_size=en_vocab_size+4, dec_voc_size=zh_vocab_size+4,
+#                     d_model=d_model, n_head=num_heads, max_len=max_len,
+#                  ffn_hidden=2048, n_layers=6, drop_prob=0.1, device=device)
+# model = Transformer(n_src_vocab=en_vocab_size+4, n_trg_vocab=zh_vocab_size+4,
+#                     src_pad_idx=2, trg_pad_idx=2)
 optimizer = ScheduledOptim(
         Adam(model.parameters(), betas=(0.9, 0.98), eps=1e-09),
-        lr_mul=2.0, d_model=512, n_warmup_steps=4000)
+        lr_mul=2.0, d_model=512, n_warmup_steps=warmup_step)
 
-create_dir_not_exist(checkpoints_dir + time_flag + '/')
-print('Checkpoints will be saved into ' + checkpoints_dir + time_flag + '/')
-create_dir_not_exist(results_dir + time_flag + '/')
-print('Results will be saved at: ' + results_dir + time_flag + '/')
+translator = Translator(model, id2token_zh, max_sen_len=max_len, beam_size=beam_size)
+translator.to(device)
 
-
-
-## train
-model.train()
-total_steps = len(train_loader)
+# total_steps = len(train_loader)
+total_steps = math.ceil(len(train_en_ids) / batch_size)
+# val_total_steps = len(val_loader)
+val_total_steps = math.ceil(len(val_en_ids) / batch_size)
 val_best_acc = 0
 val_best_loss = 10000
+val_best_bleu = 0
 val_iter_data = iter(val_loader)
 train_accs = []
 val_accs = []
 val_losss = []
 val_bleus = []
 train_losss = []
+start_step = 0
+start_epoch = 0
+resume_counter = 0
+val_step = 0
 
-for epoch in tqdm(range(num_epoch)):
+
+if is_resume:
+    model_path = conf['model_path']
+    model_param = torch.load(model_path)
+    model.load_state_dict(model_param['model'])
+
+    time_flag = model_param['time_flag']
+    # start_step = int(re.findall(r'_step_(.*?)_', model_path)[0])
+    start_epoch = int(re.findall(r'epoch_(.*?)_', model_path)[0])
+    print('Resume training from model: '+model_path)
+    print('Start epoch: {}'.format(start_epoch))
+
+
+model.to(device)
+print('device: ' + str(device))
+
+create_dir_not_exist(checkpoints_dir + time_flag + '/')
+print('Checkpoints will be saved into ' + checkpoints_dir + time_flag + '/')
+create_dir_not_exist(results_dir + time_flag + '/')
+print('Results will be saved at: ' + results_dir + time_flag + '/')
+
+model.train()
+for epoch in tqdm(range(start_epoch, num_epoch)):
     step = 0
     # train
-    for i, batch_data in enumerate(train_loader):
+    # for i, batch_data in enumerate(train_loader):
+    for i in range(total_steps):
+        batch_data = get_iter(train_en_ids[i*batch_size: (i+1)*batch_size],
+                              train_zh_ids[i*batch_size: (i+1)*batch_size],
+                              max_sen_len=max_len, batch_size=batch_size, shuffle=True)
         model.zero_grad()
         # inputs
         src_ids = batch_data['source_ids']
         tgt_ids = batch_data['target_ids']
+        gold = tgt_ids[:, 1:].contiguous().view(-1)
         # predict
-        pred = model(src_ids, tgt_ids)
+        pred = model(src_ids, tgt_ids[:, :-1])
         # scores
-        loss = cal_loss(pred, tgt_ids, is_smoothing=True)
-        acc = val_acc(model, batch_data)
-        train_losss.append(loss)
+        loss, n_correct, n_word = cal_performance(
+            pred, gold, 2, smoothing=True)
+        acc = n_correct / (n_word+0.001)
+        # loss = cal_loss(pred, tgt_ids, is_smoothing=True)
+        # acc = val_acc(pred, tgt_ids)
+        train_losss.append(loss.item())
         train_accs.append(acc)
         # print
         if step % num_print == 0:
@@ -148,18 +186,29 @@ for epoch in tqdm(range(num_epoch)):
 
         # val
         if step % save_step == 0:
-            model.eval()
-            # inputs
-            val_batch_data = val_iter_data.next()
+            val_step = val_step  % val_total_steps
+            val_batch_data = get_iter(val_en_ids[val_step*batch_size: (val_step+1)*batch_size],
+                                      val_zh_ids[val_step*batch_size: (val_step+1)*batch_size],
+                                      max_sen_len=max_len, batch_size=batch_size, shuffle=False)
             val_src_ids, val_tgt_ids = val_batch_data['source_ids'], val_batch_data['target_ids']
-            # predict
-            val_pred = model(val_src_ids, val_tgt_ids)
+            val_gold = val_tgt_ids[:, 1:].contiguous().view(-1)
+            model.eval()
+            with torch.no_grad():
+                # val_pred_ids = translator.translate_sentence(val_src_ids)
+                # val_pred_seq = from_ids_to_seq(val_pred_ids, id2token_zh)
+                val_pred = model(val_src_ids, val_tgt_ids[:, :-1])
+            val_step += 1
             # scores
-            val_set_loss = cal_loss(val_pred, val_tgt_ids, is_smoothing=True)
-            val_set_acc, val_set_bleu = val_acc(model, val_batch_data, cal_bleu=True)
+            val_set_loss, val_n_correct, val_n_word = cal_performance(
+                val_pred, val_gold, 2, smoothing=True)
+            val_set_acc = val_n_correct / (val_n_word + 0.001)
+            val_set_bleu = cal_batch_bleu(val_pred.cpu(), val_gold.cpu(), batch_size=batch_size)
+
+            # val_set_loss = cal_loss(val_pred, val_tgt_ids, is_smoothing=True)
+            # val_set_acc, val_set_bleu = val_acc(val_pred, val_tgt_ids, cal_bleu=True)
             print('Val: epoch: {} / {}|    step: {} / {}|    Loss: {}|    Acc: {}%|    BLEU: {}%|'.format(
                     epoch, num_epoch, step, total_steps, float('%.2f'%val_set_loss.item()), float('%.2f'%(val_set_acc*100)), float('%.2f'%(val_set_bleu*100))))
-            val_losss.append(val_set_loss)
+            val_losss.append(val_set_loss.item())
             val_accs.append(val_set_acc)
             val_bleus.append(val_set_bleu)
             # save train acc
@@ -172,26 +221,26 @@ for epoch in tqdm(range(num_epoch)):
             print('Acc and loss of training and val has been saved at: ' + save_scores_dir + '/')
 
             # if best, save
-            if val_best_acc <= val_set_acc or val_best_loss >= val_set_loss.item():
+            if val_best_acc <= val_set_acc or val_best_loss >= val_set_loss.item() or val_best_bleu <= val_set_bleu:
                 # update
                 val_best_acc = max(val_best_acc, val_set_acc)
                 val_best_loss = min(val_best_loss, val_set_loss.item())
+                val_best_bleu = max(val_best_bleu, val_set_bleu)
                 # logging
                 logging.info('--------------------------------')
-                logging.info('Val: epoch: {} / {}|    step: {} / {}|    acc: {}|    loss: {}|'.format(
-                    epoch, num_epoch, step, total_steps, val_set_acc, val_set_loss.item()))
+                logging.info('Val: epoch: {} / {}|    step: {} / {}|    acc: {}|    bleu: {}|    loss: {}|'.format(
+                    epoch, num_epoch, step, total_steps, val_set_acc, val_set_bleu, val_set_loss.item()))
                 # save
                 # lr = optimizer._optimizer.param_groups[0]['lr']
                 state = {'model': model.state_dict(), 'optimizer': optimizer, 'time_flag': str(time_flag)}
                 save_name = checkpoints_dir + time_flag + '/' + 'epoch_'+str(epoch)+'_step_'+str(step)\
-                            +'_acc_' + str(val_set_acc)[:5] + '_loss_' + str(val_set_loss.item())[:7] + '.checkpoint'
+                            +'_acc_' + str(val_set_acc)[:5] + '_bleu_'+ str(val_set_bleu)[:5] +'_loss_' + str(val_set_loss.item())[:7] + '.checkpoint'
                 torch.save(state, save_name)
                 print('checkpoint has been saved at: ' + save_name)
-
             model.train()
         step += 1
 
 # print final info
-print('best acc: {}|    best loss: {}'.format(val_best_acc, val_best_loss))
+print('best acc: {}|    best bleu: {}|    best loss: {}'.format(val_best_acc, val_best_bleu, val_best_loss))
 print('time_flag: ' + str(time_flag))
 

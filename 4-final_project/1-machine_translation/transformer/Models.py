@@ -47,14 +47,13 @@ class PositionalEncoding(nn.Module):
 
 class Encoder(nn.Module):
     ''' A encoder model with self attention mechanism. '''
-
     def __init__(
             self, n_src_vocab, d_word_vec, n_layers, n_head, d_k, d_v,
             d_model, d_inner, pad_idx, dropout=0.1, n_position=200, scale_emb=False):
 
         super().__init__()
 
-        self.src_word_emb = nn.Embedding(n_src_vocab, d_word_vec, padding_idx=pad_idx)
+        self.src_word_emb = nn.Embedding(n_src_vocab, d_word_vec)
         self.position_enc = PositionalEncoding(d_word_vec, n_position=n_position)
         self.dropout = nn.Dropout(p=dropout)
         self.layer_stack = nn.ModuleList([
@@ -93,7 +92,7 @@ class Decoder(nn.Module):
 
         super().__init__()
 
-        self.trg_word_emb = nn.Embedding(n_trg_vocab, d_word_vec, padding_idx=pad_idx)
+        self.trg_word_emb = nn.Embedding(n_trg_vocab, d_word_vec)
         self.position_enc = PositionalEncoding(d_word_vec, n_position=n_position)
         self.dropout = nn.Dropout(p=dropout)
         self.layer_stack = nn.ModuleList([
@@ -109,11 +108,12 @@ class Decoder(nn.Module):
 
         # -- Forward
         dec_output = self.trg_word_emb(trg_seq)
+        # print(dec_output.shape)  # torch.Size([1, 1, 512])
         if self.scale_emb:
             dec_output *= self.d_model ** 0.5
         dec_output = self.dropout(self.position_enc(dec_output))
         dec_output = self.layer_norm(dec_output)
-
+        # print(dec_output.shape)  # # torch.Size([1, 1, 512])
         for dec_layer in self.layer_stack:
             dec_output, dec_slf_attn, dec_enc_attn = dec_layer(
                 dec_output, enc_output, slf_attn_mask=trg_mask, dec_enc_attn_mask=src_mask)
@@ -129,7 +129,7 @@ class Transformer(nn.Module):
     ''' A sequence to sequence model with attention mechanism. '''
 
     def __init__(
-            self, n_src_vocab=2004, n_trg_vocab=2004, src_pad_idx=2, trg_pad_idx=2,
+            self, n_src_vocab, n_trg_vocab, src_pad_idx, trg_pad_idx,
             d_word_vec=512, d_model=512, d_inner=2048,
             n_layers=6, n_head=8, d_k=64, d_v=64, dropout=0.1, n_position=200,
             trg_emb_prj_weight_sharing=True, emb_src_trg_weight_sharing=True,
@@ -184,9 +184,8 @@ class Transformer(nn.Module):
             self.encoder.src_word_emb.weight = self.decoder.trg_word_emb.weight
 
 
-    def forward(self, data):
-        src_seq = data['source_ids']
-        trg_seq = data['target_ids']
+    def forward(self, src_seq, trg_seq):
+
         src_mask = get_pad_mask(src_seq, self.src_pad_idx)
         trg_mask = get_pad_mask(trg_seq, self.trg_pad_idx) & get_subsequent_mask(trg_seq)
 

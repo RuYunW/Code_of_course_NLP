@@ -2,24 +2,25 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import math
-from nltk.translate.bleu_score import sentence_bleu
+# from nltk.translate.bleu_score import sentence_bleu
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
-def positional_embedding(max_sen_len=64, d_model=512):
-    PE = torch.zeros([max_sen_len, d_model]).to(device)
-    for pos in range(max_sen_len):
-        for i in range(int(d_model / 2)):
-            PE[pos][2*i]   = math.sin(pos / (10000 ** ((2*i) / d_model)))
-            PE[pos][2*i+1] = math.cos(pos / (10000 ** ((2*i) / d_model)))
-    return PE
+# def positional_embedding(max_sen_len=64, d_model=512):
+#     PE = torch.zeros([max_sen_len, d_model]).to(device)
+#     for pos in range(max_sen_len):
+#         for i in range(int(d_model / 2)):
+#             PE[pos][2*i]   = math.sin(pos / (10000 ** ((2*i) / d_model)))
+#             PE[pos][2*i+1] = math.cos(pos / (10000 ** ((2*i) / d_model)))
+#     return PE
 
 class Translator(nn.Module):
     def __init__(self, model, id2token, max_sen_len=64, beam_size=5, sos_idx=0, eos_idx=1, pad_idx=2, alpha=0.7):
         super(Translator, self).__init__()
         self.alpha = alpha
         self.max_sen_len = max_sen_len
-        self.encoder_PE = positional_embedding()
+        # self.encoder_PE = positional_embedding()
+        # self.decoder_PE = positional_embedding()
         self.id2token = id2token
         self.beam_size = beam_size
         self.sos_idx = sos_idx
@@ -49,58 +50,24 @@ class Translator(nn.Module):
             torch.ones((1, len_s, len_s), device=ids.device), diagonal=1)).bool()
         return subsequent_mask
 
-    def _model_decode(self, tgt_ids, hidden_mat, src_mask, PE):
-        # Decoder Embedding
-        tgt_emb = self.model.tgt_embedding(tgt_ids)
-        # print(tgt_ids.shape)
-        tgt_pos = PE
-        # print(PE.shape)
-        # exit()
-
-        # print(tgt_emb.shape)
-        # print(PE.shape)
-        # exit()
-        tgt_feats = tgt_emb + tgt_pos[:, :tgt_emb.size(1), :]
-        # print(tgt_emb.shape)
-        # print(tgt_pos.shape)
-        # exit()
-        # tgt_feats = tgt_emb + tgt_pos
-
-        tgt_feats = self.model.dropout(tgt_feats)
-        tgt_feats = self.model.layer_norm(tgt_feats)
-        # print(tgt_feats.shape)
-
-        # Mask
+    def _model_decode(self, tgt_ids, enc_output, src_mask):
         tgt_mask = self._get_subsequent_mask(tgt_ids)
-        # print(tgt_mask.shape)
-        # Decoder
-        for decoder_block in self.model.decoder:
-            # print(tgt_feats.shape)  # torch.Size([1, 1, 512])
-            # print(tgt_mask.shape)  # torch.Size([1, 1, 1])
-            # print(src_mask.shape)  # torch.Size([1, 1, 64])
-            # exit()
-            tgt_feats = decoder_block(tgt_feats, hidden_mat, slf_attn_mask=tgt_mask, dec_enc_attn_mask=src_mask)
-        tgt_feats = self.model.linear(tgt_feats)
+        dec_output = self.decoder(tgt_ids, enc_output, tgt_mask, src_mask)
+
+        # tgt_feats = self.embedder(tgt_ids)
+        # for decoder_block in self.model.decoder:
+        #     tgt_feats = decoder_block(tgt_feats, enc_output, slf_attn_mask=tgt_mask, dec_enc_attn_mask=src_mask)
+        tgt_feats = self.model.linear(dec_output)
         return F.softmax(tgt_feats, dim=-1)
 
-    def _get_init_state(self, src_ids, src_mask, PE):
-        # Embedding
-        src_emb = self.model.src_embedding(src_ids)
-        src_pos = self.encoder_PE
-        src_feats = src_emb + src_pos
-        src_feats = self.model.dropout(src_feats)
-        src_feats = self.model.layer_norm(src_feats)
-        # Encoder
-        for encoder_block in self.model.encoder:
-            enc_output, hidden_mat = encoder_block(src_feats, src_mask)
-        # print(self.init_seq.shape)  # [1, 1]
-        # exit()
-        # PE = positional_embedding(self.init_seq.shape[1])
-        # print(PE.shape)
-        # print(666)
-        # exit()
-        # Decode
-        dec_output = self._model_decode(self.init_seq, hidden_mat, src_mask, PE=PE)
+    def _get_init_state(self, src_ids, src_mask):
+        # enc_output = self.embedder(src_ids)
+        enc_output = self.encoder(src_ids, src_mask)
+
+        # for encoder_block in self.model.encoder:
+        #     enc_output = encoder_block(enc_output, src_mask)
+        # init Decode
+        dec_output = self._model_decode(self.init_seq, enc_output, src_mask)  # torch.Size([1, 1, 4004])
 
         best_k_probs, best_k_idx = dec_output[:, -1, :].topk(self.beam_size)
 
@@ -108,10 +75,12 @@ class Translator(nn.Module):
         gen_seq = self.blank_seqs.clone().detach()
         gen_seq[:, 1] = best_k_idx[0]
         enc_output = enc_output.repeat(self.beam_size, 1, 1)
-        return enc_output, gen_seq, scores, hidden_mat
+        return gen_seq, scores, enc_output
 
     def _get_the_best_score_and_idx(self, gen_seq, dec_output, scores, step):
         assert len(scores.size()) == 1
+        # print(dec_output.shape)
+        # exit()
         # beam_size = self.beam_size
         # Get k candidates for each beam, k^2 candidates in total.
         best_k2_probs, best_k2_idx = dec_output[:, -1, :].topk(self.beam_size)
@@ -128,20 +97,25 @@ class Translator(nn.Module):
         gen_seq[:, step] = best_k_idx
         return gen_seq, scores
 
-    def translate_sentence(self, batch_data):
-        src_ids = batch_data['source_ids']
-        PE = batch_data['PE']
+    def embedder(self, ids):
+        emb = self.model.src_embedding(ids)  # [1, 64, 512]
+        pos = self.model.pos(ids)
+        feats = emb + pos
+        feats = self.model.dropout(feats)
+        feats = self.model.layer_norm(feats)
+        return feats
 
+    def translate_sentence(self, src_ids):
         assert src_ids.size(0) == 1
-        # src_pos = self.encoder_PE
 
         with torch.no_grad():
+            # src_pos = self.model.pos(src_ids)
             src_mask = self._get_pad_mask(src_ids)  # torch.Size([1, 1, 64])
-            enc_output, gen_seq, scores, hidden_mat = self._get_init_state(src_ids, src_mask, PE)
+            gen_seq, scores, enc_output = self._get_init_state(src_ids, src_mask)
 
             ans_idx = 0  # default
             for step in range(2, self.max_sen_len):  # decode up to max length
-                dec_output = self._model_decode(gen_seq[:, :step], hidden_mat, src_mask, PE)
+                dec_output = self._model_decode(gen_seq[:, :step], enc_output, src_mask)
                 gen_seq, scores = self._get_the_best_score_and_idx(gen_seq, dec_output, scores, step)
                 # Check if all path finished
                 # -- locate the eos in the generated sequences
@@ -183,22 +157,6 @@ class Translator(nn.Module):
 #                 bleu = sentence_bleu(reference, pred)
 
 
-# class Translator():
-#     def __init__(self, data_loader=None, beam_search=True, num_beams=5):
-#         self.data_loader = data_loader
-#         self.beam_search = beam_search
-#         self.num_beams = num_beams
-#
-#     def _cal_BLEU_score(self, batch_pred_tens, batch_target_ids):
-#         score = 0
-#         return score
-#
-#     def forward(self, a):
-#         return a
-#
-# translator = Translator()
-# a = 1
-# b = translator(a)
-# print(b)
+
 
 
