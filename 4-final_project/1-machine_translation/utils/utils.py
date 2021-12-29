@@ -86,35 +86,31 @@ def cal_loss(pred, gold, trg_pad_idx=2, is_smoothing=True):
     return loss
 
 cpu_device = torch.device('cpu')
-def val_acc(pred, tgt_ids, pad_idx=2, cal_bleu=False):
-    # model.eval()
-    # model.to(cpu_device)
-    # with torch.no_grad:
-    # src_ids = batch_data['source_ids']
-    # tgt_ids = batch_data['target_ids']
-    # pred = model(src_ids, tgt_ids)
-    n_correct, n_word = cal_correct(pred.cpu(), tgt_ids.cpu(), pad_idx=pad_idx)
-    acc = (n_correct+1) / (n_word+1)  # avoid being divided by zero
-    if cal_bleu:
-        bleu = cal_batch_bleu(pred.cpu(), tgt_ids.cpu())
-        return acc, bleu
-    return acc
+# def val_acc(pred, tgt_ids, pad_idx=2, cal_bleu=False):
+#
+#     n_correct, n_word = cal_correct(pred.cpu(), tgt_ids.cpu(), pad_idx=pad_idx)
+#     acc = (n_correct+1) / (n_word+1)  # avoid being divided by zero
+#     if cal_bleu:
+#         bleu = cal_batch_bleu(pred.cpu(), tgt_ids.cpu())
+#         return acc, bleu
+#     return acc
 
 
 def cal_batch_bleu(pred, gold, batch_size, pad_idx=2):
-    # batch_size = int(gold.size(0))
-    pred = pred.view(batch_size, int(pred.size(0)/batch_size), -1)
-    gold = gold.view(batch_size, int(gold.size(0)/batch_size), -1)
+    pred = pred.max(1)[1]
+    pred = pred.view(batch_size, -1)
+    gold = gold.view(batch_size, -1)
+    bleu_list = []
+    for i in range(batch_size):
+        sentence_mask = gold[i].ne(pad_idx)
+        ref = gold[i].masked_select(sentence_mask)
+        pre = pred[i].masked_select(sentence_mask)
+        ref = list(map(str, ref.tolist()))
+        pre = list(map(str, pre.tolist()))
 
-    pred = pred.max(1)[1].view(batch_size, -1)
-    pred = list(filter(not_pad, pred.tolist()))
-    gold = list(filter(not_pad, gold.tolist()))
-    bleu_list = [sentence_bleu([list(map(str, gold[i]))], list(map(str, pred[i]))) for i in range(batch_size)]
+        bleu_list.append(sentence_bleu([ref], pre))
+
     return np.array(bleu_list).mean()
-
-# def cal_batch_bleu(pred, gold, batch_size):
-#     pred = pred.view(batch_size, )
-
 
 
 def cal_correct(pred, gold, pad_idx=2):
@@ -235,6 +231,52 @@ def cal_performance(pred, gold, trg_pad_idx, smoothing=True):
     n_word = non_pad_mask.sum().item()
 
     return loss, n_correct, n_word
+
+def val(model, val_en_ids, val_zh_ids, batch_size, max_len):
+    model.eval()
+    val_set_acc_list = []
+    val_set_bleu_list = []
+    val_set_loss_list = []
+    print('Val...')
+    for val_step in tqdm(range(math.ceil(len(val_en_ids) / batch_size))):
+        val_batch_data = get_iter(val_en_ids[val_step * batch_size: (val_step + 1) * batch_size],
+                                  val_zh_ids[val_step * batch_size: (val_step + 1) * batch_size],
+                                  max_sen_len=max_len, batch_size=batch_size, shuffle=False)
+        val_src_ids, val_tgt_ids = val_batch_data['source_ids'], val_batch_data['target_ids']
+        val_gold = val_tgt_ids[:, 1:].contiguous().view(-1)
+        with torch.no_grad():
+            val_pred = model(val_src_ids, val_tgt_ids[:, :-1])
+        # scores
+        val_set_loss, val_n_correct, val_n_word = cal_performance(val_pred, val_gold, 2, smoothing=True)
+        val_set_acc = val_n_correct / (val_n_word + 0.001)
+        val_set_bleu = cal_batch_bleu(val_pred.cpu(), val_gold.cpu(), batch_size=batch_size)
+
+        val_set_acc_list.append(val_set_acc)
+        val_set_bleu_list.append(val_set_bleu)
+        val_set_loss_list.append(val_set_loss.item())
+
+        # val_print_info = 'Val: |    Loss: {}|    Acc: {}%|    BLEU: {}%|'.format(
+        #     float('%.2f' % val_set_loss.item()),
+        #     float('%.2f' % (val_set_acc * 100)),
+        #     float('%.2f' % (val_set_bleu * 100))
+        # )
+        # print(val_print_info)
+    model.train()
+    val_mean_acc = np.array(val_set_acc_list).mean()
+    val_mean_bleu = np.array(val_set_bleu_list).mean()
+    val_mean_loss = np.array(val_set_loss_list).mean()
+    val_logging_info = 'Val: |    Loss: {}|    Acc: {}%|    BLEU: {}%|'.format(
+        float('%.2f'%(val_mean_loss)),
+        float('%.2f'%(val_mean_acc*100)),
+        float('%.2f'%(val_mean_bleu*100))
+    )
+    return {'val_logging_info': val_logging_info,
+            'val_mean_acc': val_mean_acc,
+            'val_mean_bleu': val_mean_bleu,
+            'val_mean_loss': val_mean_loss}
+
+
+
 
 
 

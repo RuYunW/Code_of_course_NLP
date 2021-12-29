@@ -28,6 +28,7 @@ class PostionalEncoding(nn.Module):
 class Embedder(nn.Module):
     def __init__(self, input_dim, d_model, max_sen_len, dropout):
         super(Embedder, self).__init__()
+        self.d_model = d_model
         self.emb = nn.Embedding(input_dim, d_model)
         self.pos = PostionalEncoding(d_model, max_sen_len)
         self.dropout = nn.Dropout(dropout)
@@ -35,6 +36,7 @@ class Embedder(nn.Module):
 
     def forward(self, ids):
         emb = self.emb(ids)
+        # emb *= self.d_model ** 0.5
         pos = self.pos(ids)
         feat = emb + pos
         feat = self.dropout(feat)
@@ -45,18 +47,18 @@ class Embedder(nn.Module):
 class Transformer(nn.Module):
     def __init__(self, num_enc_layers=6, num_dec_layers=6, max_sen_len=64, d_model=512,
                  input_size=2000+4, output_size=2000+4, pad_idx=2, dropout=0.1, num_heads=8, d_inner=2048,
-                 trg_emb_prj_weight_sharing=True, emb_src_trg_weight_sharing=True):
+                 trg_emb_prj_weight_sharing=True):
         super(Transformer, self).__init__()
         self.pad_idx = pad_idx
         self.d_model = d_model
         self.scale_prj = True
-        self.encoder = Encoder(input_size, num_layers=num_enc_layers)
-        self.decoder = Decoder(output_size, num_layers=num_dec_layers)
-
+        self.encoder = Encoder(input_dim=input_size, num_layers=num_enc_layers, d_model=d_model, d_inner=d_inner,
+                               num_heads=num_heads, dropout=dropout, max_sen_len=max_sen_len)
+        self.decoder = Decoder(output_dim=output_size, num_layers=num_dec_layers, d_model=d_model, d_inner=d_inner,
+                               num_heads=num_heads, dropout=dropout, max_sen_len=max_sen_len)
         self.linear = nn.Linear(d_model, output_size)
         if trg_emb_prj_weight_sharing:
             self.linear.weight = self.decoder.embedder.emb.weight
-
 
     def _get_pad_mask(self, ids):
         mask = (ids != self.pad_idx).unsqueeze(-2)
@@ -78,19 +80,14 @@ class Transformer(nn.Module):
         dec_output = self.decoder(tgt_ids, enc_output, tgt_mask, src_mask)
 
         tgt_feats = self.linear(dec_output)  # [B, 64, 512]
-        # if self.scale_prj:
-        #     tgt_feats *= self.d_model ** -0.5
-        if self.scale_prj:
-            tgt_feats *= self.d_model ** -0.5
+        tgt_feats *= self.d_model ** -0.5
         return tgt_feats.view(-1, tgt_feats.size(2))
-
-
 
 class Encoder(nn.Module):
     def __init__(self, input_dim, num_layers=6, d_model=512, d_inner=2048, dropout=0.1, num_heads=8, max_sen_len=64):
         super(Encoder, self).__init__()
         self.d_model = d_model
-        self.scale_emb = False
+        # self.scale_emb = False
 
         self.embedder = Embedder(input_dim, d_model, max_sen_len, dropout)
         self.encoder = nn.ModuleList([
@@ -100,8 +97,8 @@ class Encoder(nn.Module):
 
     def forward(self, src_ids, src_mask):
         enc_output = self.embedder(src_ids)
-        if self.scale_emb:
-            enc_output *= self.d_model ** 0.5
+        # if self.scale_emb:
+        #     enc_output *= self.d_model ** 0.5
         for enc_blk in self.encoder:
             enc_output = enc_blk(enc_output, src_mask)
 
@@ -112,7 +109,7 @@ class Decoder(nn.Module):
     def __init__(self, output_dim, num_layers=6, d_model=512, d_inner=2048, dropout=0.1, num_heads=8, max_sen_len=64):
         super(Decoder, self).__init__()
         self.d_model = d_model
-        self.scale_emb = False
+        # self.scale_emb = False
 
         self.embedder = Embedder(output_dim, d_model, max_sen_len, dropout)
         self.decoder = nn.ModuleList([
@@ -122,8 +119,8 @@ class Decoder(nn.Module):
 
     def forward(self, src_ids, enc_output, tgt_mask, src_mask):
         dec_output = self.embedder(src_ids)
-        if self.scale_emb:
-            dec_output *= self.d_model ** 0.5
+        # if self.scale_emb:
+        #     dec_output *= self.d_model ** 0.5
 
         for dec_blk in self.decoder:
             dec_output = dec_blk(dec_output, enc_output, tgt_mask, src_mask)
