@@ -45,8 +45,8 @@ with open(ids_dir+'test_en_ids.pkl', 'rb') as f:
 with open(ids_dir+'test_zh_ids.pkl', 'rb') as f:
     test_zh_ids = pkl.load(f)
 
-test_en_ids = test_en_ids[:20]
-test_zh_ids = test_zh_ids[:20]
+test_en_ids = test_en_ids
+test_zh_ids = test_zh_ids
 # test_dataset = BatchData(test_en_ids, test_zh_ids, en_vocab_size, zh_vocab_size, max_len, token2id_en, token2id_zh)
 # test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
 
@@ -98,7 +98,7 @@ for i in range(len(test_en_ids)):
 
     acc_scores.append(acc)
     bleu_scores.append(bleu)
-    print('Test: |    Acc: {}%|    BLEU: {}%'.format(float('%.2f'%(acc*100)), float('%.2f'%(bleu*100))))
+    print('Eval: |    Sample: {}/{}|    Acc: {}%|    BLEU: {}%'.format(i, len(test_en_ids), float('%.2f'%(acc*100)), float('%.2f'%(bleu*100))))
 
 acc_scores = np.array(acc_scores)
 bleu_scores = np.array(bleu_scores)

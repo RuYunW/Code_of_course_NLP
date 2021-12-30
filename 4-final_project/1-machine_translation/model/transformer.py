@@ -25,6 +25,8 @@ class PostionalEncoding(nn.Module):
         batch_size, seq_len = x.size()
         return self.encoding[:seq_len, :]
 
+
+
 class Embedder(nn.Module):
     def __init__(self, input_dim, d_model, max_sen_len, dropout):
         super(Embedder, self).__init__()
@@ -83,6 +85,8 @@ class Transformer(nn.Module):
         tgt_feats *= self.d_model ** -0.5
         return tgt_feats.view(-1, tgt_feats.size(2))
 
+
+
 class Encoder(nn.Module):
     def __init__(self, input_dim, num_layers=6, d_model=512, d_inner=2048, dropout=0.1, num_heads=8, max_sen_len=64):
         super(Encoder, self).__init__()
@@ -103,6 +107,7 @@ class Encoder(nn.Module):
             enc_output = enc_blk(enc_output, src_mask)
 
         return enc_output
+
 
 
 class Decoder(nn.Module):
@@ -126,6 +131,7 @@ class Decoder(nn.Module):
             dec_output = dec_blk(dec_output, enc_output, tgt_mask, src_mask)
 
         return dec_output
+
 
 
 class EncoderBlock(nn.Module):
@@ -159,6 +165,7 @@ class EncoderBlock(nn.Module):
         tens = self.dropout(tens)
         tens = self.layer_norm(enc_output + tens)
         return tens
+
 
 
 class DecoderBlock(nn.Module):
@@ -196,6 +203,7 @@ class DecoderBlock(nn.Module):
         tens_3 = self.norm_layer(tens_2 + tens_3)
 
         return tens_3
+
 
 
 class MultiHeadAttention(nn.Module):
@@ -241,6 +249,7 @@ class MultiHeadAttention(nn.Module):
         Z = self._scaled_dot_product_attention(Q, K, V, mask)
         Z = Z.transpose(1, 2).contiguous().view(batch_size, len_q, -1)
         return Z
+
 
 
 class ScheduledOptim():

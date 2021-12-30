@@ -16,7 +16,8 @@ figures_dir = conf['figures_dir']
 # time_flag = '2021-12-24 12%3A20%3A05'
 # time_flag = '2021-12-24 12%3A38%3A18'
 # time_flag = '2021-12-24 21%3A44%3A19'
-time_flag = '2021-12-24 22%3A26%3A57'
+# time_flag = '2021-12-24 22%3A26%3A57'
+time_flag = '2021-12-29 12%3A08%3A44'
 
 results_time_flag = './results/'+time_flag + '/'
 train_acc_path = results_time_flag + 'train_acc_scores.npy'
@@ -31,8 +32,8 @@ val_acc = np.load(val_acc_path)
 val_bleu_path = results_time_flag + 'val_bleu_scores.npy'
 val_bleu = np.load(val_bleu_path)
 
-print(max(val_bleu))
-print(val_bleu.mean())
+# print(max(val_bleu))
+# print(val_bleu.mean())
 # val_loss_path = time_flag + 'val_loss.npy'
 # val_loss = np.load(val_loss_path)
 
@@ -48,8 +49,8 @@ print(val_bleu.mean())
 # time_flag = model_param['time_flag']
 
 # print(len(train_acc))
-train_x = np.arange(0, len(train_acc)*10, 10)
-val_x = np.arange(0, len(val_acc)*2000, 2000)
+train_x = np.arange(0, len(train_acc))
+val_x = np.arange(0, len(val_acc)*3500, 3500)
 
 
 plt.plot(train_x, train_acc)
@@ -68,4 +69,3 @@ plt.title('Acc and BLEU scores in training.')
 plt.savefig(figures_dir + 'results_plot_' + time_flag + '.png')
 # print(acc_save_name_list)
 # val_accs = np.load()
-

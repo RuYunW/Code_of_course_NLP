@@ -52,7 +52,7 @@ class Translator(nn.Module):
 
     def _model_decode(self, tgt_ids, enc_output, src_mask):
         tgt_mask = self._get_subsequent_mask(tgt_ids)
-        dec_output = self.decoder(tgt_ids, enc_output, tgt_mask, src_mask)
+        dec_output = self.model.decoder(tgt_ids, enc_output, tgt_mask, src_mask)
 
         # tgt_feats = self.embedder(tgt_ids)
         # for decoder_block in self.model.decoder:
@@ -62,7 +62,7 @@ class Translator(nn.Module):
 
     def _get_init_state(self, src_ids, src_mask):
         # enc_output = self.embedder(src_ids)
-        enc_output = self.encoder(src_ids, src_mask)
+        enc_output = self.model.encoder(src_ids, src_mask)
 
         # for encoder_block in self.model.encoder:
         #     enc_output = encoder_block(enc_output, src_mask)

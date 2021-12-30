@@ -14,7 +14,7 @@
   "vocab_dir": "./features/vocab/",
   "sep_dir": "./features/sep/",
   "ids_dir": "./features/ids/",
-  "model_path": "/home/wry/NLP_code/4-final_project/1-machine_translation/checkpoints/2021-12-27 18:18:36/epoch_29_step_4000_acc_0.249_bleu_0.0_loss_2129.40.checkpoint",
+  "model_path": "/home/wry/NLP_code/4-final_project/1-machine_translation/checkpoints/2021-12-29 12:08:44/epoch_49_step_3500_acc_0.359_bleu_0.057_loss_2121.12.checkpoint",
 
   "batch_size": 20,
   "num_epoch": 50,
